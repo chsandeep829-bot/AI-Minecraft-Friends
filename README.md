@@ -59,3 +59,6 @@ The mining task works on nearby supported blocks and is capped at 12 blocks per 
 
 ## Security
 No API key is embedded. Online AI is not implemented yet. Any future online AI service must keep credentials server-side and expose only a restricted HTTPS endpoint to the add-on.
+
+
+Phase 2 source is validated by the repository's automated GitHub Actions workflow.
