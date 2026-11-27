@@ -34,7 +34,14 @@ for (const required of [
   "collectTick",
   "mineTick",
   "inventory",
-  "MINE_DROPS"
+  "MINE_DROPS",
+  "startHut",
+  "hutBlueprint",
+  "buildTick",
+  "safeExploreTarget",
+  "exploreTick",
+  "action === \"build\"",
+  "action === \"explore\""
 ]) assert(script.includes(required), "Missing Phase 2 implementation marker: " + required);
 
-console.log("PASS: JSON syntax, pack UUID dependency, stable Script API declaration, entity/model/texture files, and Phase 2 task/inventory hooks.");
+console.log("PASS: JSON syntax, pack UUID dependency, stable Script API declaration, entity/model/texture files, and Phase 2 task/inventory hooks and Phase 3 hut-building/safe-exploration hooks.");

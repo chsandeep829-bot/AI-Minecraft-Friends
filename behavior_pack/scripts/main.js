@@ -97,6 +97,17 @@ function addInventory(entity, itemId, amount) {
   inventory[itemId] = current + accepted;
   return writeInventory(entity, inventory) ? accepted : 0;
 }
+
+function removeInventory(entity, itemId, amount) {
+  const inventory = readInventory(entity);
+  const current = Number(inventory[itemId] || 0);
+  if (current < amount) return false;
+  const remaining = current - amount;
+  if (remaining > 0) inventory[itemId] = remaining;
+  else delete inventory[itemId];
+  return writeInventory(entity, inventory);
+}
+
 function taskOf(entity) {
   try { return String(entity.getDynamicProperty(TASK_KEY) || "idle"); }
   catch { return "idle"; }
@@ -118,6 +129,8 @@ function stopTask(entity) {
   try {
     entity.setDynamicProperty(MINE_TARGET_KEY, "");
     entity.setDynamicProperty(MINE_COUNT_KEY, 0);
+    entity.setDynamicProperty("aimf_build_plan_v1", "");
+    entity.setDynamicProperty("aimf_explore_target_v1", "");
   } catch {}
 }
 function spawnFriend(player, name) {
@@ -269,6 +282,171 @@ function collectTick(entity) {
   return collected;
 }
 
+
+const BUILD_COST_ITEM = "minecraft:oak_log";
+const HUT_COST = 24;
+
+// A compact 3x3 shelter: two perimeter wall courses (door opening left at
+// the front) and a flat roof. Only air cells are changed; existing blocks
+// are never overwritten. Costs are deducted from the companion's ledger.
+function hutBlueprint(origin) {
+  const cells = [];
+  for (let y = 1; y <= 2; y++) {
+    for (let x = -1; x <= 1; x++) {
+      for (let z = -1; z <= 1; z++) {
+        const edge = Math.abs(x) === 1 || Math.abs(z) === 1;
+        const doorway = y === 1 && x === 0 && z === 1;
+        if (edge && !doorway) cells.push({ x: origin.x+x, y: origin.y+y, z: origin.z+z });
+      }
+    }
+  }
+  for (let x = -1; x <= 1; x++) {
+    for (let z = -1; z <= 1; z++) cells.push({ x: origin.x+x, y: origin.y+3, z: origin.z+z });
+  }
+  return cells;
+}
+function isAirBlock(block) {
+  return !!block && (block.typeId === "minecraft:air" ||
+    block.typeId === "minecraft:cave_air" ||
+    block.typeId === "minecraft:void_air");
+}
+function startHut(player, friend) {
+  const inventory = readInventory(friend);
+  if (Number(inventory[BUILD_COST_ITEM] || 0) < HUT_COST) {
+    reply(player, displayName(friend) + " needs " + HUT_COST + " oak_log in their companion inventory. Current: " + Number(inventory[BUILD_COST_ITEM] || 0) + ".");
+    return;
+  }
+  const origin = { x: Math.floor(player.location.x) + 4, y: Math.floor(player.location.y), z: Math.floor(player.location.z) };
+  const cells = hutBlueprint(origin);
+  try {
+    // Require a flat, solid 3x3 foundation and empty build volume.
+    for (let x = -1; x <= 1; x++) {
+      for (let z = -1; z <= 1; z++) {
+        const ground = player.dimension.getBlock({ x: origin.x+x, y: origin.y-1, z: origin.z+z });
+        if (!ground || isAirBlock(ground) || ground.typeId.includes("water") || ground.typeId.includes("lava")) {
+          reply(player, "Cannot build here: the 3x3 foundation must be flat and solid.");
+          return;
+        }
+      }
+    }
+    for (const pos of cells) {
+      if (!isAirBlock(player.dimension.getBlock(pos))) {
+        reply(player, "Cannot build here: the hut area is obstructed. Move to a clear flat area.");
+        return;
+      }
+    }
+    friend.setDynamicProperty("aimf_build_plan_v1", JSON.stringify({
+      dimension: player.dimension.id,
+      origin,
+      cells,
+      index: 0
+    }));
+    setTask(friend, "build_hut");
+    setRole(friend, "builder");
+    setMode(friend, "follow");
+    reply(player, displayName(friend) + " accepted the hut plan. Building costs " + HUT_COST + " oak_log and will not replace existing blocks.");
+  } catch (error) {
+    reply(player, "Could not prepare the build area: " + String(error).slice(0, 90));
+  }
+}
+function buildTick(player, friend) {
+  let plan;
+  try { plan = JSON.parse(String(friend.getDynamicProperty("aimf_build_plan_v1") || "null")); } catch {}
+  if (!plan || !Array.isArray(plan.cells) || !plan.origin) {
+    stopTask(friend);
+    reply(player, displayName(friend) + "'s build plan was missing; task stopped.");
+    return;
+  }
+  if (plan.dimension !== player.dimension.id || friend.dimension.id !== player.dimension.id) return;
+  const here = friend.location;
+  const dx = plan.origin.x - here.x;
+  const dz = plan.origin.z - here.z;
+  const distance = Math.sqrt(dx*dx + dz*dz);
+  if (distance > 2.6) {
+    const length = Math.max(distance, 0.001);
+    try { friend.applyImpulse({ x: dx/length*TASK_IMPULSE, y: 0.012, z: dz/length*TASK_IMPULSE }); } catch {}
+    return;
+  }
+  const index = Number(plan.index || 0);
+  if (index >= plan.cells.length) {
+    stopTask(friend);
+    reply(player, displayName(friend) + " completed the oak-log hut.");
+    return;
+  }
+  const pos = plan.cells[index];
+  try {
+    const block = player.dimension.getBlock(pos);
+    if (!isAirBlock(block)) {
+      stopTask(friend);
+      reply(player, "Build stopped: a target block became obstructed. Already placed blocks were left in place.");
+      return;
+    }
+    if (!removeInventory(friend, BUILD_COST_ITEM, 1)) {
+      stopTask(friend);
+      reply(player, "Build stopped: " + displayName(friend) + " ran out of oak_log. Partial build remains.");
+      return;
+    }
+    try {
+      block.setType(BUILD_COST_ITEM);
+    } catch (error) {
+      addInventory(friend, BUILD_COST_ITEM, 1);
+      stopTask(friend);
+      reply(player, "Build stopped because Minecraft rejected a block placement. Materials refunded for that block.");
+      return;
+    }
+    plan.index = index + 1;
+    friend.setDynamicProperty("aimf_build_plan_v1", JSON.stringify(plan));
+    if (plan.index >= plan.cells.length) {
+      stopTask(friend);
+      reply(player, displayName(friend) + " completed the oak-log hut. Remaining oak_log: " + Number(readInventory(friend)[BUILD_COST_ITEM] || 0) + ".");
+    }
+  } catch (error) {
+    stopTask(friend);
+    reply(player, "Build task stopped: " + String(error).slice(0, 90));
+  }
+}
+function safeExploreTarget(entity) {
+  const base = entity.location;
+  const y = Math.floor(base.y);
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 2 + Math.floor(Math.random() * 4);
+    const x = Math.floor(base.x + Math.cos(angle) * radius);
+    const z = Math.floor(base.z + Math.sin(angle) * radius);
+    try {
+      const floor = entity.dimension.getBlock({ x, y: y-1, z });
+      const feet = entity.dimension.getBlock({ x, y, z });
+      const head = entity.dimension.getBlock({ x, y: y+1, z });
+      if (!floor || isAirBlock(floor) || floor.typeId.includes("water") || floor.typeId.includes("lava")) continue;
+      if (!isAirBlock(feet) || !isAirBlock(head)) continue;
+      return { x: x+0.5, y, z: z+0.5 };
+    } catch {}
+  }
+  return null;
+}
+function exploreTick(player, friend) {
+  if (friend.dimension.id !== player.dimension.id) return;
+  const targetRaw = friend.getDynamicProperty("aimf_explore_target_v1");
+  let target;
+  try { target = targetRaw ? JSON.parse(String(targetRaw)) : null; } catch {}
+  const here = friend.location;
+  if (!target || Math.hypot(target.x-here.x, target.z-here.z) < 1.2) {
+    target = safeExploreTarget(friend);
+    if (!target) {
+      stopTask(friend);
+      reply(player, displayName(friend) + " could not find a safe nearby exploration step.");
+      return;
+    }
+    try { friend.setDynamicProperty("aimf_explore_target_v1", JSON.stringify(target)); } catch {}
+  }
+  const dx = target.x-here.x;
+  const dz = target.z-here.z;
+  const distance = Math.sqrt(dx*dx+dz*dz);
+  if (distance < 1.2) return;
+  const length = Math.max(distance, 0.001);
+  try { friend.applyImpulse({ x: dx/length*TASK_IMPULSE, y: 0.012, z: dz/length*TASK_IMPULSE }); } catch {}
+}
+
 function runCommand(player, raw) {
   const text = raw.trim();
   if (!text) return;
@@ -279,7 +457,7 @@ function runCommand(player, raw) {
   const target = parts[2] || "all";
 
   if (action === "help") {
-    reply(player, "Commands: spawn <name|count>, list, follow/stay/come <name|all>, rename <old> <new>, role <name> <companion|miner|collector>, mine <name|all> <block>, collect <name|all>, inventory <name>, task <name>, stop <name|all>, remove <name|all>.");
+    reply(player, "Commands: spawn <name|count>, list, follow/stay/come <name|all>, rename <old> <new>, role <name> <companion|miner|collector|builder|scout>, mine <name|all> <block>, collect <name|all>, build <name> hut, explore <name>, inventory <name>, task <name>, stop <name|all>, remove <name|all>.");
     return;
   }
   if (action === "spawn") {
@@ -323,8 +501,8 @@ function runCommand(player, raw) {
   if (action === "role") {
     const friends = selected(player, target);
     const role = String(parts[3] || "").toLowerCase();
-    if (!friends.length || !["companion", "miner", "collector"].includes(role)) {
-      reply(player, "Usage: !friends role <name|all> <companion|miner|collector>"); return;
+    if (!friends.length || !["companion", "miner", "collector", "builder", "scout"].includes(role)) {
+      reply(player, "Usage: !friends role <name|all> <companion|miner|collector|builder|scout>"); return;
     }
     for (const friend of friends) setRole(friend, role);
     reply(player, "Updated " + friends.length + " friend(s) to role " + role + ".");
@@ -345,6 +523,30 @@ function runCommand(player, raw) {
     reply(player, "Assigned " + started + " friend(s) to mine nearby " + blockId.replace("minecraft:", "") + ". Each task mines up to " + MINE_LIMIT + " blocks.");
     return;
   }
+  if (action === "build") {
+    const friend = findFriend(player, target);
+    const structure = String(parts[3] || "hut").toLowerCase();
+    if (!friend || structure !== "hut") {
+      reply(player, "Usage: !friends build <friendName> hut. Only one builder can claim a hut site at a time.");
+      return;
+    }
+    if (taskOf(friend) !== "idle") {
+      reply(player, displayName(friend) + " is busy. Use !friends stop " + displayName(friend) + " first.");
+      return;
+    }
+    startHut(player, friend);
+    return;
+  }
+  if (action === "explore" || action === "scout") {
+    const friend = findFriend(player, target);
+    if (!friend) { reply(player, "No matching friend. Use !friends list."); return; }
+    stopTask(friend);
+    setTask(friend, "explore");
+    setRole(friend, "scout");
+    try { friend.setDynamicProperty("aimf_explore_target_v1", ""); } catch {}
+    reply(player, displayName(friend) + " started cautious nearby exploration. This is not long-range autonomous survival.");
+    return;
+  }
   if (action === "collect") {
     const friends = selected(player, target);
     if (!friends.length) { reply(player, "No matching friend. Use !friends list."); return; }
@@ -362,7 +564,9 @@ function runCommand(player, raw) {
     const friend = findFriend(player, target);
     if (!friend) { reply(player, "No matching friend. Use !friends list."); return; }
     let count = Number(friend.getDynamicProperty(MINE_COUNT_KEY) || 0);
-    reply(player, displayName(friend) + " — role: " + getRole(friend) + "; task: " + taskOf(friend) + (taskOf(friend) === "mine" ? "; mined this task: " + count + "/" + MINE_LIMIT : "") + ".");
+    const task = taskOf(friend);
+    const progress = task === "mine" ? "; mined this task: " + count + "/" + MINE_LIMIT : task === "build_hut" ? "; hut construction in progress" : "";
+    reply(player, displayName(friend) + " — role: " + getRole(friend) + "; task: " + task + progress + ".");
     return;
   }
   if (action === "stop") {
@@ -427,7 +631,11 @@ system.runInterval(() => {
   for (const player of world.getAllPlayers()) {
     for (const friend of allFriends(player)) {
       const task = taskOf(friend);
-      if (task === "mine") {
+      if (task === "build_hut") {
+        buildTick(player, friend);
+      } else if (task === "explore") {
+        exploreTick(player, friend);
+      } else if (task === "mine") {
         const result = mineTick(friend);
         if (result === "complete") reply(player, displayName(friend) + " finished the mining task. Inventory: " + inventorySummary(friend));
         else if (result === "none") {
