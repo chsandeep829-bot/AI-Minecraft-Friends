@@ -14,6 +14,8 @@ const ROLE_KEY = "aimf_role_v1";
 const MINE_TARGET_KEY = "aimf_mine_target_v1";
 const MINE_COUNT_KEY = "aimf_mine_count_v1";
 const MINE_LIMIT = 12;
+const GUARD_KEY = "aimf_guard_anchor_v1";
+const PATROL_KEY = "aimf_patrol_anchor_v1";
 
 // Phase 2 mining is intentionally restricted to common blocks and uses a
 // companion-owned virtual inventory ledger. It does not emulate tool tiers,
@@ -457,7 +459,7 @@ function runCommand(player, raw) {
   const target = parts[2] || "all";
 
   if (action === "help") {
-    reply(player, "Commands: spawn <name|count>, list, follow/stay/come <name|all>, rename <old> <new>, role <name> <companion|miner|collector|builder|scout>, mine <name|all> <block>, collect <name|all>, build <name> hut, explore <name>, inventory <name>, task <name>, stop <name|all>, remove <name|all>.");
+    reply(player, "Commands: spawn <name|count>, list, follow/stay/come <name|all>, rename <old> <new>, role <name> <role>, mine <name|all> <block>, collect <name|all>, build <name> <hut|tower>, explore <name>, guard <name>, patrol <name>, sethome/home <name>, inventory <name>, task <name>, stop <name|all>, remove <name|all>.");
     return;
   }
   if (action === "spawn") {
@@ -635,7 +637,7 @@ system.runInterval(() => {
   for (const player of world.getAllPlayers()) {
     for (const friend of allFriends(player)) {
       const task = taskOf(friend);
-      if (task === "mine" || task === "collect" || task === "build_hut" || task === "explore") continue;
+      if (task === "mine" || task === "collect" || task === "build_hut" || task === "explore" || task === "guard" || task === "patrol") continue;
       if (friend.hasTag("aimf_mode_stay")) continue;
       if (friend.dimension.id !== player.dimension.id) continue;
       const a = friend.location, b = player.location;
@@ -659,6 +661,10 @@ system.runInterval(() => {
         buildTick(player, friend);
       } else if (task === "explore") {
         exploreTick(player, friend);
+      } else if (task === "guard") {
+        guardTick(player, friend);
+      } else if (task === "patrol") {
+        patrolTick(player, friend);
       } else if (task === "mine") {
         const result = mineTick(friend);
         if (result === "complete") reply(player, displayName(friend) + " finished the mining task. Inventory: " + inventorySummary(friend));
