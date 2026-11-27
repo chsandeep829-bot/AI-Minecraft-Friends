@@ -84,6 +84,9 @@ The pack targets the stable `@minecraft/server` 2.0.0 module and declares minimu
 - `!friends build Alex tower` (requires 4 oak_log)
 - `!friends sethome Alex` / `!friends home Alex`
 - `!friends guard Alex` / `!friends patrol Alex`
+- `!friends build Alex tower` (requires 4 oak_log)
+- `!friends sethome Alex` / `!friends home Alex`
+- `!friends guard Alex` / `!friends patrol Alex`
 - `!friends explore Alex` / `!friends scout Alex`
 - `!friends collect Alex`
 - `!friends inventory Alex`
