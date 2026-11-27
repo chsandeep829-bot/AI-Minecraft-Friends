@@ -1,0 +1,54 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "AI Friends BP",
+    "description": "Behavior pack for AI Minecraft Friends",
+    "uuid": "0a8f8d7e-8b4a-4c75-9b36-1d3a6f4e2c10",
+    "version": [
+      1,
+      0,
+      1
+    ],
+    "min_engine_version": [
+      1,
+      21,
+      90
+    ]
+  },
+  "modules": [
+    {
+      "type": "data",
+      "uuid": "6c9c2f0a-8b74-4bca-96f4-11d6f0a9a101",
+      "version": [
+        1,
+        0,
+        1
+      ]
+    },
+    {
+      "type": "script",
+      "language": "javascript",
+      "uuid": "6c9c2f0a-8b74-4bca-96f4-11d6f0a9a102",
+      "version": [
+        1,
+        0,
+        1
+      ],
+      "entry": "scripts/main.js"
+    }
+  ],
+  "dependencies": [
+    {
+      "uuid": "7e6d2f1c-9a83-4f5b-a621-2b8c4d0e3f20",
+      "version": [
+        1,
+        0,
+        1
+      ]
+    },
+    {
+      "module_name": "@minecraft/server",
+      "version": "2.0.0"
+    }
+  ]
+}
