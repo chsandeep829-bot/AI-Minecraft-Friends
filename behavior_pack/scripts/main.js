@@ -407,6 +407,51 @@ function buildTick(player, friend) {
     reply(player, "Build task stopped: " + String(error).slice(0, 90));
   }
 }
+function moveToward(entity, target, speed = TASK_IMPULSE) {
+  const here = entity.location;
+  const dx = target.x - here.x, dz = target.z - here.z;
+  const distance = Math.hypot(dx, dz);
+  if (distance < 0.9) return true;
+  const length = Math.max(distance, 0.001);
+  try { entity.applyImpulse({ x:dx/length*speed, y:0.012, z:dz/length*speed }); } catch {}
+  return false;
+}
+function startGuard(player, friend) {
+  const p = player.location;
+  try {
+    friend.setDynamicProperty(GUARD_KEY, JSON.stringify({ x:p.x, y:p.y, z:p.z, dimension:player.dimension.id }));
+    setTask(friend, "guard"); setRole(friend, "guard"); setMode(friend, "stay");
+    reply(player, displayName(friend) + " is guarding this position. Guarding is non-combat.");
+  } catch { reply(player, "Could not set guard position."); }
+}
+function guardTick(player, friend) {
+  let anchor;
+  try { anchor = JSON.parse(String(friend.getDynamicProperty(GUARD_KEY) || "null")); } catch {}
+  if (!anchor || anchor.dimension !== player.dimension.id || friend.dimension.id !== player.dimension.id) return;
+  if (Math.hypot(anchor.x-friend.location.x, anchor.z-friend.location.z) > 5) moveToward(friend, anchor);
+}
+function patrolTick(player, friend) {
+  if (friend.dimension.id !== player.dimension.id) return;
+  let anchor, target;
+  try {
+    anchor = JSON.parse(String(friend.getDynamicProperty(PATROL_KEY) || "null"));
+    target = JSON.parse(String(friend.getDynamicProperty("aimf_patrol_target_v1") || "null"));
+  } catch {}
+  if (!anchor || anchor.dimension !== player.dimension.id) {
+    anchor = { x:friend.location.x, y:friend.location.y, z:friend.location.z, dimension:player.dimension.id };
+    try { friend.setDynamicProperty(PATROL_KEY, JSON.stringify(anchor)); } catch {}
+  }
+  if (!target || Math.hypot(target.x-friend.location.x, target.z-friend.location.z) < 1.1) {
+    target = safeExploreTarget(friend);
+    if (!target || Math.hypot(target.x-anchor.x, target.z-anchor.z) > 9) {
+      try { friend.setDynamicProperty("aimf_patrol_target_v1", ""); } catch {}
+      return;
+    }
+    try { friend.setDynamicProperty("aimf_patrol_target_v1", JSON.stringify(target)); } catch {}
+  }
+  moveToward(friend, target);
+}
+
 function safeExploreTarget(entity) {
   const base = entity.location;
   const y = Math.floor(base.y);
@@ -537,6 +582,45 @@ function runCommand(player, raw) {
       return;
     }
     startHut(player, friend);
+    return;
+  }
+  if (action === "guard") {
+    const friend = findFriend(player, target);
+    if (!friend) { reply(player, "No matching friend. Use !friends list."); return; }
+    stopTask(friend); startGuard(player, friend); return;
+  }
+  if (action === "patrol") {
+    const friend = findFriend(player, target);
+    if (!friend) { reply(player, "No matching friend. Use !friends list."); return; }
+    stopTask(friend);
+    try {
+      friend.setDynamicProperty(PATROL_KEY, JSON.stringify({ x:friend.location.x, y:friend.location.y, z:friend.location.z, dimension:friend.dimension.id }));
+      friend.setDynamicProperty("aimf_patrol_target_v1", "");
+      setTask(friend, "patrol"); setRole(friend, "scout");
+      reply(player, displayName(friend) + " started a cautious patrol near this position.");
+    } catch { reply(player, "Could not start patrol."); }
+    return;
+  }
+  if (action === "sethome") {
+    const friend = findFriend(player, target);
+    if (!friend) { reply(player, "No matching friend. Use !friends list."); return; }
+    try {
+      friend.setDynamicProperty("aimf_home_v1", JSON.stringify({ x:friend.location.x, y:friend.location.y, z:friend.location.z, dimension:friend.dimension.id }));
+      reply(player, displayName(friend) + "'s home position was saved.");
+    } catch { reply(player, "Could not save home position."); }
+    return;
+  }
+  if (action === "home") {
+    const friend = findFriend(player, target);
+    if (!friend) { reply(player, "No matching friend. Use !friends list."); return; }
+    try {
+      const home = JSON.parse(String(friend.getDynamicProperty("aimf_home_v1") || "null"));
+      if (!home) { reply(player, "No home saved. Use !friends sethome " + displayName(friend) + "."); return; }
+      if (home.dimension !== player.dimension.id) { reply(player, "Home is in another dimension. Travel there first."); return; }
+      friend.teleport({ x:home.x, y:home.y, z:home.z }, { dimension:player.dimension });
+      stopTask(friend); setMode(friend, "stay");
+      reply(player, displayName(friend) + " returned to saved home.");
+    } catch { reply(player, "Could not return friend home."); }
     return;
   }
   if (action === "explore" || action === "scout") {
