@@ -586,10 +586,9 @@ function runCommand(player, raw) {
   reply(player, "I don't know that command yet. Use !friends help.");
 }
 
-world.afterEvents.chatSend.subscribe(event => {
-  const message = event.message.trim();
+function handleChatMessage(player, rawMessage) {
+  const message = String(rawMessage ?? "").trim();
   const lower = message.toLowerCase();
-  const player = event.sender;
   if (lower.startsWith("!friends") || lower.startsWith("!friend")) {
     runCommand(player, message);
     return;
@@ -603,7 +602,32 @@ world.afterEvents.chatSend.subscribe(event => {
     else if (/\b(collect|pick up)\b/.test(lower)) runCommand(player, "!friends collect all");
     else if (/\b(mine|chop|gather wood)\b/.test(lower)) runCommand(player, "!friends mine all oak_log");
   }
-});
+}
+
+// Chat events differ between Bedrock Script API releases. Prefer the
+// cancellable before-event, and defer world mutations until the next tick.
+const beforeChatSend = world.beforeEvents?.chatSend;
+if (beforeChatSend && typeof beforeChatSend.subscribe === "function") {
+  beforeChatSend.subscribe(event => {
+    const message = String(event.message ?? "");
+    const isFriendCommand = /^\s*!friends?\b/i.test(message);
+    if (isFriendCommand) event.cancel = true;
+    const player = event.sender;
+    system.run(() => handleChatMessage(player, message));
+  });
+} else {
+  // Compatibility fallback for API versions exposing only the after-event.
+  const afterChatSend = world.afterEvents?.chatSend;
+  if (afterChatSend && typeof afterChatSend.subscribe === "function") {
+    afterChatSend.subscribe(event => {
+      const player = event.sender;
+      const message = event.message;
+      system.run(() => handleChatMessage(player, message));
+    });
+  } else {
+    console.warn("[AI Friends BP] Chat event unavailable; check the installed Minecraft Bedrock Script API version.");
+  }
+}
 
 let taskTick = 0;
 system.runInterval(() => {
