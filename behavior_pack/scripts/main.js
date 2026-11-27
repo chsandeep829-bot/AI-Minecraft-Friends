@@ -351,6 +351,30 @@ function startHut(player, friend) {
     reply(player, "Could not prepare the build area: " + String(error).slice(0, 90));
   }
 }
+function startTower(player, friend) {
+  const cost = 4;
+  if (Number(readInventory(friend)[BUILD_COST_ITEM] || 0) < cost) {
+    reply(player, displayName(friend) + " needs 4 oak_log in their virtual inventory.");
+    return;
+  }
+  const origin = { x:Math.floor(player.location.x)+4, y:Math.floor(player.location.y), z:Math.floor(player.location.z) };
+  try {
+    const floor = player.dimension.getBlock({ x:origin.x, y:origin.y-1, z:origin.z });
+    if (!floor || isAirBlock(floor) || floor.typeId.includes("water") || floor.typeId.includes("lava")) {
+      reply(player, "Choose a solid, dry foundation for the tower."); return;
+    }
+    const cells = [1,2,3,4].map(y => ({ x:origin.x, y:origin.y+y, z:origin.z }));
+    if (cells.some(pos => !isAirBlock(player.dimension.getBlock(pos)))) {
+      reply(player, "Tower site is obstructed. Choose a clear 1x1 column."); return;
+    }
+    friend.setDynamicProperty("aimf_build_plan_v1", JSON.stringify({
+      structure:"tower", dimension:player.dimension.id, origin, cells, index:0
+    }));
+    setTask(friend, "build_hut"); setRole(friend, "builder"); setMode(friend, "follow");
+    reply(player, displayName(friend) + " accepted the 4-block oak-log lookout tower plan.");
+  } catch (error) { reply(player, "Could not prepare tower: " + String(error).slice(0, 80)); }
+}
+
 function buildTick(player, friend) {
   let plan;
   try { plan = JSON.parse(String(friend.getDynamicProperty("aimf_build_plan_v1") || "null")); } catch {}
@@ -372,7 +396,7 @@ function buildTick(player, friend) {
   const index = Number(plan.index || 0);
   if (index >= plan.cells.length) {
     stopTask(friend);
-    reply(player, displayName(friend) + " completed the oak-log hut.");
+    reply(player, displayName(friend) + " completed the " + (plan.structure || "hut") + ".");
     return;
   }
   const pos = plan.cells[index];
@@ -400,7 +424,7 @@ function buildTick(player, friend) {
     friend.setDynamicProperty("aimf_build_plan_v1", JSON.stringify(plan));
     if (plan.index >= plan.cells.length) {
       stopTask(friend);
-      reply(player, displayName(friend) + " completed the oak-log hut. Remaining oak_log: " + Number(readInventory(friend)[BUILD_COST_ITEM] || 0) + ".");
+      reply(player, displayName(friend) + " completed the " + (plan.structure || "hut") + ". Remaining oak_log: " + Number(readInventory(friend)[BUILD_COST_ITEM] || 0) + ".");
     }
   } catch (error) {
     stopTask(friend);
@@ -573,15 +597,16 @@ function runCommand(player, raw) {
   if (action === "build") {
     const friend = findFriend(player, target);
     const structure = String(parts[3] || "hut").toLowerCase();
-    if (!friend || structure !== "hut") {
-      reply(player, "Usage: !friends build <friendName> hut. Only one builder can claim a hut site at a time.");
+    if (!friend || !["hut", "tower"].includes(structure)) {
+      reply(player, "Usage: !friends build <friendName> <hut|tower>.");
       return;
     }
     if (taskOf(friend) !== "idle") {
       reply(player, displayName(friend) + " is busy. Use !friends stop " + displayName(friend) + " first.");
       return;
     }
-    startHut(player, friend);
+    if (structure === "hut") startHut(player, friend);
+    else startTower(player, friend);
     return;
   }
   if (action === "guard") {
