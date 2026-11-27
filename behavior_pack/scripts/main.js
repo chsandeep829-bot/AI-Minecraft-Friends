@@ -407,15 +407,16 @@ function buildTick(player, friend) {
       reply(player, "Build stopped: a target block became obstructed. Already placed blocks were left in place.");
       return;
     }
-    if (!removeInventory(friend, BUILD_COST_ITEM, 1)) {
+    const buildItem = plan.item || BUILD_COST_ITEM;
+    if (!removeInventory(friend, buildItem, 1)) {
       stopTask(friend);
       reply(player, "Build stopped: " + displayName(friend) + " ran out of oak_log. Partial build remains.");
       return;
     }
     try {
-      block.setType(BUILD_COST_ITEM);
+      block.setType(buildItem);
     } catch (error) {
-      addInventory(friend, BUILD_COST_ITEM, 1);
+      addInventory(friend, buildItem, 1);
       stopTask(friend);
       reply(player, "Build stopped because Minecraft rejected a block placement. Materials refunded for that block.");
       return;

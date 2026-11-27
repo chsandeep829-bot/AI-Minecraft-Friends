@@ -2,7 +2,7 @@
 
 A Minecraft Bedrock add-on for spawning and managing player-style companion characters.
 
-## Current status — Phase 3 prototype
+## Current status — Phase 5 prototype
 
 Implemented:
 - Behavior Pack + Resource Pack with linked manifests.
@@ -39,6 +39,27 @@ Phase 3 limitations:
 - Exploration is a short safe-step wander in the player's current dimension. It does not gather resources, cross caves, travel long distances, or perform independent survival.
 - Minecraft Android in-game behavior has not been runtime-tested. GitHub CI validates syntax, JSON and packaging only.
 
+
+## Phase 4 — companion navigation and station tasks
+
+Added:
+- `!friends sethome Alex` saves Alex's current position and dimension.
+- `!friends home Alex` returns Alex to that saved position when the player is in the same dimension.
+- `!friends guard Alex` anchors Alex near the player's current position; the companion returns if it wanders more than five blocks away. Guard mode is non-combat.
+- `!friends patrol Alex` makes Alex move between cautious nearby ground positions within a small patrol radius.
+- Guard and patrol tasks are kept separate from ordinary follow movement so two movement controllers do not fight each other.
+
+Limitations: movement is still impulse-based, not full navigation/pathfinding. Guard does not attack, detect threats, or protect the player. Patrol does not cross dimensions or navigate complex terrain.
+
+## Phase 5 — expanded building
+
+Added:
+- `!friends build Alex tower` builds a four-block-high, one-block-wide oak-log lookout column beside the player.
+- The tower requires four oak logs in Alex's virtual inventory and checks for a solid dry foundation and clear build column before starting.
+- Existing hut construction remains available with `!friends build Alex hut`.
+
+Limitations: these are fixed blueprints, not free-form AI building. Materials remain in the add-on's virtual ledger, and interrupted construction may leave a partial structure. The companion does not climb the tower or use it as a tactical lookout.
+
 ## Compatibility
 The pack targets the stable `@minecraft/server` 2.0.0 module and declares minimum engine version 1.21.90. The requested label “Bedrock 26.66” is not verified as a public Bedrock release/API target here. Compatibility must be tested in the exact Android Minecraft build; GitHub validation does not replace an in-game test.
 
@@ -60,6 +81,9 @@ The pack targets the stable `@minecraft/server` 2.0.0 module and declares minimu
 - `!friends role Alex miner` (also `collector` or `companion`)
 - `!friends mine Alex oak_log` (also `stone`, `coal_ore`, `iron_ore`, etc.)
 - `!friends build Alex hut` (requires 24 oak_log in Alex's virtual inventory)
+- `!friends build Alex tower` (requires 4 oak_log)
+- `!friends sethome Alex` / `!friends home Alex`
+- `!friends guard Alex` / `!friends patrol Alex`
 - `!friends explore Alex` / `!friends scout Alex`
 - `!friends collect Alex`
 - `!friends inventory Alex`

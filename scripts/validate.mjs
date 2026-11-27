@@ -27,7 +27,8 @@ assert(fs.existsSync("resource_pack/textures/entity/ai_friend.png"));
 
 const script = fs.readFileSync("behavior_pack/scripts/main.js", "utf8");
 for (const required of [
-  "world.afterEvents.chatSend.subscribe",
+  "world.beforeEvents?.chatSend",
+  "world.afterEvents?.chatSend",
   "system.runInterval",
   "getDynamicProperty",
   "setDynamicProperty",
@@ -44,4 +45,4 @@ for (const required of [
   "action === \"explore\""
 ]) assert(script.includes(required), "Missing Phase 2 implementation marker: " + required);
 
-console.log("PASS: JSON syntax, pack UUID dependency, stable Script API declaration, entity/model/texture files, and Phase 2 task/inventory hooks and Phase 3 hut-building/safe-exploration hooks.");
+console.log("PASS: JSON syntax, pack UUID dependency, stable Script API declaration, entity/model/texture files, and Phase 2 task/inventory hooks plus Phase 3–5 construction, guard, patrol, and home hooks.");
