@@ -716,29 +716,33 @@ function handleChatMessage(player, rawMessage) {
   }
 }
 
-// Chat events differ between Bedrock Script API releases. Prefer the
-// cancellable before-event, and defer world mutations until the next tick.
+// Stable command entry point: players run
+// /scriptevent aimf:friends <action> in chat. Unlike chatSend interception,
+// scriptEventReceive is available from the stable @minecraft/server module.
+const scriptEventSignal = system.afterEvents?.scriptEventReceive;
+if (scriptEventSignal && typeof scriptEventSignal.subscribe === "function") {
+  scriptEventSignal.subscribe(event => {
+    if (event.id !== "aimf:friends") return;
+    const player = event.sourceEntity;
+    if (!player || player.typeId !== "minecraft:player") return;
+    const args = String(event.message ?? "").trim();
+    system.run(() => runCommand(player, "!friends " + args));
+  });
+} else {
+  console.warn("[AI Friends BP] Script event receiver unavailable; check the @minecraft/server dependency.");
+}
+
+// Optional chat-prefix support for game versions that expose the pre-release
+// chatSend event. The stable slash-command path above does not depend on it.
 const beforeChatSend = world.beforeEvents?.chatSend;
 if (beforeChatSend && typeof beforeChatSend.subscribe === "function") {
   beforeChatSend.subscribe(event => {
     const message = String(event.message ?? "");
-    const isFriendCommand = /^\s*!friends?\b/i.test(message);
-    if (isFriendCommand) event.cancel = true;
+    if (!/^\\s*!friends?\\b/i.test(message)) return;
+    event.cancel = true;
     const player = event.sender;
     system.run(() => handleChatMessage(player, message));
   });
-} else {
-  // Compatibility fallback for API versions exposing only the after-event.
-  const afterChatSend = world.afterEvents?.chatSend;
-  if (afterChatSend && typeof afterChatSend.subscribe === "function") {
-    afterChatSend.subscribe(event => {
-      const player = event.sender;
-      const message = event.message;
-      system.run(() => handleChatMessage(player, message));
-    });
-  } else {
-    console.warn("[AI Friends BP] Chat event unavailable; check the installed Minecraft Bedrock Script API version.");
-  }
 }
 
 let taskTick = 0;

@@ -28,7 +28,8 @@ assert(fs.existsSync("resource_pack/textures/entity/ai_friend.png"));
 const script = fs.readFileSync("behavior_pack/scripts/main.js", "utf8");
 for (const required of [
   "world.beforeEvents?.chatSend",
-  "world.afterEvents?.chatSend",
+  "system.afterEvents?.scriptEventReceive",
+  "aimf:friends",
   "system.runInterval",
   "getDynamicProperty",
   "setDynamicProperty",
