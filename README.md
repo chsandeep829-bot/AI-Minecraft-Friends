@@ -15,7 +15,7 @@ Implemented in this repository:
 Not yet implemented: true block mining, inventory management, construction, combat AI, independent survival, online AI service, custom skin importing, and a full in-game graphical management screen. These are planned phases, not claimed features.
 
 ## Compatibility
-The requested label “Bedrock 26.66” could not be independently verified as a public Bedrock release/API target. The pack declares a conservative minimum engine version of 1.21.0 and uses the stable `@minecraft/server` 2.0.0 module contract. Actual compatibility must be tested in the exact Android Minecraft build; the version label alone is not treated as proof.
+The requested label “Bedrock 26.66” could not be independently verified as a public Bedrock release/API target. The pack declares a conservative minimum engine version of 1.21.90 and uses the stable `@minecraft/server` 2.0.0 module contract. Actual compatibility must be tested in the exact Android Minecraft build; the version label alone is not treated as proof.
 
 ## Install on Android
 1. Download the packaged `.mcaddon` from the repository's successful GitHub Actions build artifact.
