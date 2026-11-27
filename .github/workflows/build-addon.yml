@@ -13,8 +13,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Validate source
+      - name: Validate JSON and project contracts
         run: npm test
+      - name: Check JavaScript syntax
+        run: node --check behavior_pack/scripts/main.js
       - name: Package .mcaddon
         run: |
           mkdir -p dist
