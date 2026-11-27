@@ -2,7 +2,7 @@
 
 A Minecraft Bedrock add-on for spawning and managing player-style companion characters.
 
-## Current status — Phase 2 prototype
+## Current status — Phase 3 prototype
 
 Implemented:
 - Behavior Pack + Resource Pack with linked manifests.
@@ -27,7 +27,7 @@ Important Phase 2 limitations:
 
 Added:
 - `!friends build Alex hut`: asks Alex to build a small 3×3 oak-log shelter near the player.
-- Building requires 24 `oak_log) in that companion's virtual inventory ledger.
+- Building requires 24 `oak_log` in that companion's virtual inventory ledger.
 - The hut builder checks for a flat 3×3 solid foundation and an unobstructed build volume before starting. It places one block per task tick, only into air, and deducts one ledger log per successful placement.
 - `!friends explore Alex` (or `scout`) starts short-range cautious wandering. It selects nearby positions only when the target has a solid non-liquid floor and two air blocks above.
 - Roles now include `builder` and `scout`.

@@ -611,7 +611,7 @@ system.runInterval(() => {
   for (const player of world.getAllPlayers()) {
     for (const friend of allFriends(player)) {
       const task = taskOf(friend);
-      if (task === "mine" || task === "collect") continue;
+      if (task === "mine" || task === "collect" || task === "build_hut" || task === "explore") continue;
       if (friend.hasTag("aimf_mode_stay")) continue;
       if (friend.dimension.id !== player.dimension.id) continue;
       const a = friend.location, b = player.location;
