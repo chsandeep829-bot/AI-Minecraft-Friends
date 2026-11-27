@@ -41,6 +41,14 @@ for (const required of [
   "buildTick",
   "safeExploreTarget",
   "exploreTick",
+  "guardTick",
+  "patrolTick",
+  "startGuard",
+  "startTower",
+  "action === \"guard\"",
+  "action === \"patrol\"",
+  "action === \"home\"",
+  "action === \"sethome\"",
   "action === \"build\"",
   "action === \"explore\""
 ]) assert(script.includes(required), "Missing Phase 2 implementation marker: " + required);
